@@ -1,50 +1,50 @@
-\name{HARestimate}
-\alias{HARestimate}
+\name{HAREstimate}
+\alias{HAREstimate}
 \title{
 HAR estimation
 }
 \description{
-This function does HAR estimation in line with Corsi(2009)..
+HAR estimation
 }
 \usage{
-HARestimate(vRealizedMeasure, vJumpComponent = NULL, vAuxData = NULL, vLags = c(1,5,22),
-            vJumpLags = NULL, vAuxLags = NULL, type = "HAR",
-            InsanityFilter = TRUE, HARQargs = list(demean = TRUE ),show=TRUE )
+HAREstimate(RM, BPV = NULL, RQ = NULL, periods = c(1,5,22),
+            periodsJ = NULL, periodsRQ = NULL, type = "HAR",
+            insanityFilter = TRUE, h = 1)
 }
 \arguments{
-  \item{vRealizedMeasure}{
+  \item{RM}{
 A \code{numeric} containing a realized measure of the integrated volatility.
 }
-  \item{vJumpComponent}{
-A \code{numeric} containing the jump proportion of the realized measure used for \code{HARJ} and \code{HARQ-J} types.
+  \item{BPV}{
+A \code{numeric} containing the estimate of the continuous part of the integrated volatility used for \code{HARJ} and \code{HARQ-J} types.
   }
-  \item{vAuxData}{
+  \item{RQ}{
 A \code{numeric} containing  the realized quarticity used for \code{HARQ} and \code{HARQ-J} types.
   }
-  \item{vLags}{
+  \item{periods}{
 A \code{numeric} denoting which lags should be used in the estimation, standard of \code{c(1,5,22)} is in line with Corsi(2009).
 }
-  \item{vJumpLags}{
+  \item{periodsJ}{
 A \code{numeric} denoting which lags should be used in Jump estimation, if applicable.
   }
-  \item{vAuxLags}{
+  \item{periodsRQ}{
 A \code{numeric} denoting which lags should be used in Realized Quarticity estimation, if applicable.
   }
   \item{type}{
 A \code{character} denoting which type of HAR model to estimate.
   }
-  \item{InsanityFilter}{
+  \item{insanityFilter}{
 A \code{logical} denoting whether the insanity filter should be used for the fitted values of the estimation see Bollerslev, Patton & Quaedvlieg(2016) footnote 17. 
   }
-  \item{HARQargs}{
-A \code{list} denoting the extra arguments of a \code{type} \code{HARQ} or \code{Full-HARQ} model. So far only the boolean \code{demean} is implemented, which determines whether the data should be demeaned as is the case in Bollerslev, Patton & Quaedvlieg(2016).
+  \item{h}{
+A \code{integer} denoting the whether and how much to aggregate the realized variance estimator, if h = 5 the model is for the weekly volatility and if h = 22, the model is for the monthly volatility, the default of 1 designates no aggregation.
   }
-\item{show}{
-Logical to determine whether the output should be shown when done.
-}
 }
 \value{
 A \code{\linkS4class{HARModel}} object
+}
+\details{
+The estimates for the HARQ and HARQ-J models differ slightly from the results of BPQ (2016). This is due to a small difference in the demeaning approach for the realized quarticity. Here, the demeaning is done with mean(RQ) over all periods.
 }
 \references{
 Corsi, F. 2009, A Simple Approximate Long-Memory Model
@@ -60,7 +60,18 @@ Emil Sjoerup
 data("SP500RM")
 SP500rv = SP500RM$RV
 #Estimate the HAR model:
-FitHAR = HARestimate(vRealizedMeasure = SP500rv, vLags = c(1,5,22))
+FitHAR = HAREstimate(RM = SP500rv, periods = c(1,5,22))
+
+#extract the estimated coefficients:
+coef(FitHAR)
+#plot the fitted values
+plot(FitHAR)
+
+#calculate the Q-like loss-function:
+mean(qlike(FitHAR))
+
+
+
 
 #HAR-J:
 #load data
@@ -68,35 +79,48 @@ data("SP500RM")
 SP500rv = SP500RM$RV
 SP500bpv = SP500RM$BPV
 
-vJumpComponent = SP500rv - SP500bpv
-vJumpComponent = ifelse(vJumpComponent>=0, vJumpComponent, 0)
 #Estimate the HAR-J model:
-FitHARJ = HARestimate(vRealizedMeasure = SP500rv, vJumpComponent = vJumpComponent, 
-                       vLags = c(1,5,22), vJumpLags = c(1,5,22),  type = "HARJ" )
+FitHARJ = HAREstimate(RM = SP500rv, BPV = SP500bpv, 
+                       periods = c(1,5,22), periodsJ = c(1,5,22),  type = "HARJ" )
 
-#HAR-Q of BPQ(2016)
+#Calculate the Q-like loss-function:
+mean(qlike(FitHARJ))
+
+
+
+
+#HAR-Q of BPQ(2016) with weekly aggregation
 #load data
 data("SP500RM")
 SP500rv = SP500RM$RV
 SP500rq = SP500RM$RQ
 #Estimate the HAR-Q model:
-FitHARQ = HARestimate(vRealizedMeasure = SP500rv, vAuxData = SP500rq, vLags = c(1,5,22),
-                       vAuxLags = c(1,5,22),  type = "HARQ", HARQargs = list(demean =TRUE))
+FitHARQ = HAREstimate(RM = SP500rv, RQ = SP500rq, periods = c(1,5,22),
+                       periodsRQ = c(1,5,22),  type = "HARQ", h = 5)
+#Show the model:
+show(FitHARQ)
 
-#HARQ-J of BPQ(2016)
+#Extract the coefficients:
+HARQcoef = coef(FitHARQ)
+
+
+
+
+#HARQ-J of BPQ(2016) with monthly aggregation
 #load data
 data("SP500RM")
 SP500rv = SP500RM$RV
 SP500rq = SP500RM$RQ
 SP500bpv = SP500RM$BPV
 
-vJumpComponent = SP500rv - SP500bpv
-vJumpComponent = ifelse(vJumpComponent>=0, vJumpComponent, 0)
 #Estimate the HARQ-J model:
-FitHARQJ = HARestimate(vRealizedMeasure = SP500rv, vJumpComponent = vJumpComponent,
-                        vAuxData = SP500rq, vLags = c(1,5,22),
-                        vJumpLags = c(1,5,22), vAuxLags = c(1), 
-                        type = "HARQ-J", HARQargs = list(demean = TRUE))
+FitHARQJ = HAREstimate(RM = SP500rv, BPV = SP500bpv,
+                        RQ = SP500rq, periods = c(1,5,22),
+                        periodsJ = c(1), periodsRQ = c(1), 
+                        type = "HARQ-J", h = 22)
+#show the model:
+show(FitHARQJ)
+
 
 
 }
